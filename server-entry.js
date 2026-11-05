@@ -154,6 +154,7 @@ const server = createServer(async (req, res) => {
 
       const supabaseUrl = process.env.SUPABASE_URL || "";
       const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
       const { createClient } = await import("@supabase/supabase-js");
       const supabase = createClient(supabaseUrl, anonKey, {
@@ -168,12 +169,35 @@ const server = createServer(async (req, res) => {
         });
         result = error ? { error: error.message, session: null } : { error: null, session: data.session };
       } else if (url.pathname === "/api/auth/register") {
-        const { data, error } = await supabase.auth.signUp({
-          email: body.email,
-          password: body.password,
-          options: { data: { name: body.name } },
-        });
-        result = error ? { error: error.message, session: null } : { error: null, session: data.session };
+        if (serviceRoleKey) {
+          const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email: body.email,
+            password: body.password,
+            email_confirm: true,
+            user_metadata: { name: body.name },
+          });
+          if (createError) {
+            result = { error: createError.message, session: null };
+          } else {
+            const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+              email: body.email,
+              password: body.password,
+            });
+            result = loginError
+              ? { error: loginError.message, session: null }
+              : { error: null, session: loginData.session };
+          }
+        } else {
+          const { data, error } = await supabase.auth.signUp({
+            email: body.email,
+            password: body.password,
+            options: { data: { name: body.name } },
+          });
+          result = error ? { error: error.message, session: null } : { error: null, session: data.session };
+        }
       } else {
         res.writeHead(404);
         res.end("Not Found");

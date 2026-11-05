@@ -24,6 +24,7 @@ function devApiAuthPlugin(env: Record<string, string>): Plugin {
 
           const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
           const anonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+          const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
           const supabase = createClient(supabaseUrl, anonKey, {
             auth: { persistSession: false, autoRefreshToken: false },
@@ -37,12 +38,35 @@ function devApiAuthPlugin(env: Record<string, string>): Plugin {
             });
             result = error ? { error: error.message, session: null } : { error: null, session: data.session };
           } else if (url.pathname === "/api/auth/register") {
-            const { data, error } = await supabase.auth.signUp({
-              email: body.email,
-              password: body.password,
-              options: { data: { name: body.name } },
-            });
-            result = error ? { error: error.message, session: null } : { error: null, session: data.session };
+            if (serviceRoleKey) {
+              const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+                auth: { persistSession: false, autoRefreshToken: false },
+              });
+              const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: body.email,
+                password: body.password,
+                email_confirm: true,
+                user_metadata: { name: body.name },
+              });
+              if (createError) {
+                result = { error: createError.message, session: null };
+              } else {
+                const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+                  email: body.email,
+                  password: body.password,
+                });
+                result = loginError
+                  ? { error: loginError.message, session: null }
+                  : { error: null, session: loginData.session };
+              }
+            } else {
+              const { data, error } = await supabase.auth.signUp({
+                email: body.email,
+                password: body.password,
+                options: { data: { name: body.name } },
+              });
+              result = error ? { error: error.message, session: null } : { error: null, session: data.session };
+            }
           } else {
             res.statusCode = 404;
             res.end("Not Found");
