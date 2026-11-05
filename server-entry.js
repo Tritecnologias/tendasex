@@ -100,6 +100,7 @@ const server = createServer(async (req, res) => {
       const headers = { ...req.headers };
       delete headers.host;
       delete headers.connection;
+      delete headers["accept-encoding"];
 
       const bodyChunks = [];
       req.on("data", (chunk) => bodyChunks.push(chunk));
@@ -114,6 +115,9 @@ const server = createServer(async (req, res) => {
 
       const resHeaders = {};
       proxyRes.headers.forEach((value, key) => { resHeaders[key] = value; });
+      delete resHeaders["content-encoding"];
+      delete resHeaders["content-length"];
+      delete resHeaders["transfer-encoding"];
       // Add CORS headers
       resHeaders["access-control-allow-origin"] = "*";
       resHeaders["access-control-allow-methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
