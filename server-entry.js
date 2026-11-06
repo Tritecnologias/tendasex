@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,18 +52,12 @@ function tryServeStatic(req, res) {
   const url = new URL(req.url, `http://localhost`);
   const pathname = url.pathname;
 
-  // Only serve from /assets/ path (Vite output) and /images/ (product images)
-  if (!pathname.startsWith("/assets/") && !pathname.startsWith("/images/") && pathname !== "/favicon.ico") {
+  // Only serve from /assets/ path (Vite output) and /favicon.ico
+  if (!pathname.startsWith("/assets/") && pathname !== "/favicon.ico") {
     return false;
   }
 
-  // /images/ serve from /data/product-images/
-  let filePath;
-  if (pathname.startsWith("/images/")) {
-    filePath = join("/data/product-images", pathname.replace("/images/", ""));
-  } else {
-    filePath = join(clientDir, pathname);
-  }
+  const filePath = join(clientDir, pathname);
 
   try {
     if (!existsSync(filePath) || !statSync(filePath).isFile()) {
@@ -86,9 +80,73 @@ function tryServeStatic(req, res) {
   }
 }
 
+async function tryServeImage(req, res) {
+  const url = new URL(req.url, `http://localhost`);
+  const pathname = url.pathname;
+  if (!pathname.startsWith("/images/")) return false;
+
+  let fileName;
+  try {
+    fileName = decodeURIComponent(pathname.replace("/images/", ""));
+  } catch {
+    fileName = pathname.replace("/images/", "");
+  }
+  const localPath = join("/data/product-images", fileName);
+
+  try {
+    if (existsSync(localPath) && statSync(localPath).isFile()) {
+      const ext = extname(localPath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "image/jpeg";
+      const content = readFileSync(localPath);
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Content-Length": content.length,
+        "Cache-Control": "public, max-age=86400, immutable",
+      });
+      res.end(content);
+      return true;
+    }
+  } catch {}
+
+  // Fallback para o servidor original com auto-cache em disco
+  const fallbackHost = process.env.IMAGE_FALLBACK_URL || "https://sexy.tritecnologias.com.br";
+  try {
+    const remoteUrl = fallbackHost.replace(/\/$/, "") + pathname;
+    const remoteRes = await fetch(remoteUrl);
+    if (remoteRes.ok) {
+      const arrayBuffer = await remoteRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const ext = extname(pathname).toLowerCase();
+      const contentType = remoteRes.headers.get("content-type") || MIME_TYPES[ext] || "image/jpeg";
+
+      try {
+        mkdirSync("/data/product-images", { recursive: true });
+        writeFileSync(localPath, buffer);
+      } catch (saveErr) {}
+
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Content-Length": buffer.length,
+        "Cache-Control": "public, max-age=86400, immutable",
+      });
+      res.end(buffer);
+      return true;
+    }
+  } catch (err) {
+    console.error("[image-fallback] Falha ao buscar imagem remota:", err.message);
+  }
+
+  res.writeHead(404, { "Content-Type": "text/plain" });
+  res.end("Image Not Found");
+  return true;
+}
+
 const server = createServer(async (req, res) => {
-  // Try static files first
+  // Try static assets first
   if (tryServeStatic(req, res)) return;
+
+  // Try product images with automatic remote fallback and caching
+  if (await tryServeImage(req, res)) return;
 
   // Supabase proxy — all client-side Supabase calls go through here to avoid CORS
   if (req.url?.startsWith("/supabase/")) {

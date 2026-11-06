@@ -119,6 +119,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/supabase/, ""),
         },
+        "/images": {
+          target: "https://sexy.tritecnologias.com.br",
+          changeOrigin: true,
+        },
       },
     },
   };
