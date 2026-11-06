@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { QrCode, CreditCard, FileText, Save, Loader2, Truck, FlaskConical, Zap, TriangleAlert, Package2, Eye, EyeOff, Wifi, WifiOff, CheckCircle2, MessageCircle, Bell, Star } from "lucide-react";
+import { QrCode, CreditCard, FileText, Save, Loader2, Truck, FlaskConical, Zap, TriangleAlert, Package2, Eye, EyeOff, Wifi, WifiOff, CheckCircle2, MessageCircle, Bell, Star, Store } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getStoreSettings, updateStoreSettings, getShippingConfig, updateShippingConfig, getTestMode, updateTestMode, getInventorySettings, updateInventorySettings, type InventorySettings } from "@/fns/settings";
+import { getStoreSettings, updateStoreSettings, getShippingConfig, updateShippingConfig, getTestMode, updateTestMode, getInventorySettings, updateInventorySettings, getStoreInfo, updateStoreInfo, type StoreInfoSettings, DEFAULT_STORE_INFO, type InventorySettings } from "@/fns/settings";
 import { getLoyaltyConfig, updateLoyaltyConfig, type LoyaltyConfig } from "@/fns/loyalty";
 import { getCorreiosSettings, updateCorreiosSettings, testCorreiosConnection, CORREIOS_SERVICES, type CorreiosSettings } from "@/fns/correios";
 import { getWhatsAppSettings, updateWhatsAppSettings, testWhatsAppConnection, type WhatsAppSettings } from "@/fns/whatsapp";
@@ -40,6 +40,27 @@ function AdminConfig() {
     queryKey: ["store-settings"],
     queryFn: () => getStoreSettings(),
     enabled: !!user && profile?.role === "admin",
+  });
+
+  const { data: storeInfo, isLoading: isStoreInfoLoading } = useQuery({
+    queryKey: ["store-info"],
+    queryFn: () => getStoreInfo(),
+    enabled: !!user && profile?.role === "admin",
+  });
+
+  const [storeInfoForm, setStoreInfoForm] = useState<StoreInfoSettings>(DEFAULT_STORE_INFO);
+
+  useEffect(() => {
+    if (storeInfo) setStoreInfoForm(storeInfo);
+  }, [storeInfo]);
+
+  const saveStoreInfoMut = useMutation({
+    mutationFn: () => updateStoreInfo({ data: storeInfoForm }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["store-info"] });
+      toast.success("Identidade da loja salva com sucesso!");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao salvar identidade"),
   });
 
   const [enabledMethods, setEnabledMethods] = useState<PaymentMethod[]>([]);
@@ -259,6 +280,103 @@ function AdminConfig() {
   return (
     <AdminLayout title="Configurações">
       <div className="max-w-3xl space-y-6">
+
+        {/* Identidade da Loja */}
+        <div className="rounded-lg border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-display font-bold">Identidade da Loja</h2>
+            <Store className="h-4 w-4 text-neon" />
+          </div>
+          <p className="text-xs text-muted-foreground mb-5">
+            Configure o nome da marca, slogan e logotipo exibidos no cabeçalho, rodapé e e-mails.
+          </p>
+
+          {isStoreInfoLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveStoreInfoMut.mutate();
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Nome da Loja
+                </label>
+                <input
+                  type="text"
+                  value={storeInfoForm.name}
+                  onChange={(e) => setStoreInfoForm({ ...storeInfoForm, name: e.target.value })}
+                  placeholder="Ex: Secret Desire"
+                  required
+                  className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-neon focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Slogan / Tagline
+                </label>
+                <input
+                  type="text"
+                  value={storeInfoForm.tagline}
+                  onChange={(e) => setStoreInfoForm({ ...storeInfoForm, tagline: e.target.value })}
+                  placeholder="Ex: Prazer com discrição. Entrega sigilosa."
+                  className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-neon focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Descrição Institucional
+                </label>
+                <textarea
+                  rows={2}
+                  value={storeInfoForm.description}
+                  onChange={(e) => setStoreInfoForm({ ...storeInfoForm, description: e.target.value })}
+                  placeholder="Descrição institucional exibida no rodapé ou metadados"
+                  className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-neon focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  URL do Logotipo (Opcional)
+                </label>
+                <input
+                  type="url"
+                  value={storeInfoForm.logo_url}
+                  onChange={(e) => setStoreInfoForm({ ...storeInfoForm, logo_url: e.target.value })}
+                  placeholder="https://exemplo.com/logo.png"
+                  className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-neon focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Se preenchido, substitui o texto do nome no topo pelo logotipo. Deixe em branco para usar o nome em texto estilizado.
+                </p>
+                {storeInfoForm.logo_url && (
+                  <div className="mt-2 p-2 bg-background/50 rounded border border-border inline-block">
+                    <img src={storeInfoForm.logo_url} alt="Prévia do logo" className="h-8 max-w-[200px] object-contain" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={saveStoreInfoMut.isPending}
+                  className="inline-flex items-center gap-2 rounded-md bg-neon px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-neon/90 disabled:opacity-50"
+                >
+                  {saveStoreInfoMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar Identidade
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* Formas de pagamento */}
         <div className="rounded-lg border border-border bg-card p-5">

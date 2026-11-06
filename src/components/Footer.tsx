@@ -1,17 +1,24 @@
 import { ShieldCheck, Truck, CreditCard, Lock } from "lucide-react";
-import { STORE } from "@/lib/store";
+import { STORE, useStore } from "@/lib/store";
 
 export function Footer() {
+  const store = useStore();
   return (
     <footer className="mt-24 border-t border-border bg-card/40">
       <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-neon glow" />
-              <span className="font-display text-lg font-bold">{STORE.name.toUpperCase()}</span>
+              {store.logoUrl ? (
+                <img src={store.logoUrl} alt={store.name} className="h-8 max-w-[160px] object-contain" />
+              ) : (
+                <>
+                  <span className="inline-block h-2.5 w-2.5 rounded-full bg-neon glow" />
+                  <span className="font-display text-lg font-bold">{store.name.toUpperCase()}</span>
+                </>
+              )}
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{STORE.tagline}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{store.tagline}</p>
           </div>
           <div>
             <h4 className="text-sm font-semibold">Loja</h4>
@@ -49,7 +56,7 @@ export function Footer() {
             <span className="inline-flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-neon" /> Envio em 24h</span>
             <span className="inline-flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-neon" /> Parcelado em até 6x</span>
           </div>
-          <p>© {new Date().getFullYear()} {STORE.name}. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} {store.name}. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

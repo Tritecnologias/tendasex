@@ -16,6 +16,7 @@ import { getAdminOrders } from "@/fns/orders";
 import { getAdminProducts } from "@/fns/products";
 import { getDashboardStats } from "@/fns/analytics";
 import { formatBRL } from "@/lib/cart";
+import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Admin Dashboard — Secret Desire" }] }),
@@ -404,6 +405,7 @@ function KpiCard({
 // ─── AdminLayout + SideLink ───────────────────────────────────────────────────
 
 export function AdminLayout({ title, children }: { title: string; children: React.ReactNode }) {
+  const store = useStore();
   const { newCount } = useOrderNotif();
   const { data: products } = useQuery({
     queryKey: ["admin-products"],
@@ -417,7 +419,7 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
         <div className="px-5 pb-6">
           <Link to="/" className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-neon glow" />
-            <span className="font-display text-sm font-bold">Secret Desire</span>
+            <span className="font-display text-sm font-bold">{store.name}</span>
           </Link>
           <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Admin</p>
         </div>

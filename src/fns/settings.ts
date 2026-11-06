@@ -181,3 +181,62 @@ export const updateInventorySettings = createServerFn()
       );
     return data;
   });
+
+// ─── Identidade da Loja (Marca / Nome / Logo) ──────────────────────────────────
+
+export type StoreInfoSettings = {
+  name: string;
+  tagline: string;
+  description: string;
+  logo_url: string;
+};
+
+export const DEFAULT_STORE_INFO: StoreInfoSettings = {
+  name: "Secret Desire",
+  tagline: "Prazer com discrição. Entrega sigilosa.",
+  description:
+    "Produtos eróticos selecionados para casais e solo. Embalagem 100% discreta garantida.",
+  logo_url: "",
+};
+
+export const getStoreInfo = createServerFn().handler(
+  async (): Promise<StoreInfoSettings> => {
+    try {
+      const db = createSupabaseAdmin();
+      const { data } = await db
+        .from("store_settings")
+        .select("value")
+        .eq("key", "store_info")
+        .maybeSingle();
+      if (!data?.value) return DEFAULT_STORE_INFO;
+      return { ...DEFAULT_STORE_INFO, ...(data.value as Partial<StoreInfoSettings>) };
+    } catch {
+      return DEFAULT_STORE_INFO;
+    }
+  },
+);
+
+export const updateStoreInfo = createServerFn()
+  .inputValidator((input: unknown) =>
+    z.object({
+      name: z.string().trim().min(1, "O nome da loja não pode ser vazio").max(100),
+      tagline: z.string().trim().max(255).default(""),
+      description: z.string().trim().max(1000).default(""),
+      logo_url: z.string().trim().default(""),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const db = createSupabaseAdmin();
+    const { error } = await db
+      .from("store_settings")
+      .upsert(
+        {
+          key: "store_info",
+          value: data as unknown as import("../lib/database.types").Json,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" },
+      );
+    if (error) throw new Error(error.message);
+    return data;
+  });

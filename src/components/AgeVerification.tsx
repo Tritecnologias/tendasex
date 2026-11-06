@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { ShieldCheck } from "lucide-react";
-import { STORE } from "@/lib/store";
+import { STORE, useStore } from "@/lib/store";
 
 const STORAGE_KEY = "age_verified";
 
 export function AgeVerification() {
+  const store = useStore();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export function AgeVerification() {
         </div>
 
         {/* Título */}
-        <h2 className="font-display text-2xl font-bold">{STORE.name}</h2>
+        <h2 className="font-display text-2xl font-bold">{store.name}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Este site contém conteúdo destinado exclusivamente para maiores de 18 anos.
         </p>
