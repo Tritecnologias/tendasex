@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Package,
   AlertTriangle, CheckCircle2, Star, Heart, FileUp, Search,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Download, Loader2,
 } from "lucide-react";
+import Papa from "papaparse";
 import { useAuth } from "@/lib/auth";
 import {
   getAdminProductsPaged, getAdminProductStats,
   deleteProduct, updateProduct, adjustStock,
+  getAllProductsForExport,
 } from "@/fns/products";
 import { getTopWishlisted } from "@/fns/wishlist";
 import { StockMovements } from "./-stock-movements";
@@ -369,6 +371,65 @@ function AdminProducts() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    const toastId = toast.loading("Carregando catálogo completo para exportação…");
+    try {
+      const allProducts = await getAllProductsForExport();
+      if (!allProducts.length) {
+        toast.error("Nenhum produto encontrado para exportar.", { id: toastId });
+        return;
+      }
+
+      toast.loading(`Gerando CSV de ${allProducts.length} produtos…`, { id: toastId });
+
+      const rows = allProducts.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        price: p.price,
+        old_price: p.old_price ?? "",
+        stock: p.stock ?? 0,
+        category: p.category ?? "",
+        tag: p.tag ?? "",
+        active: p.active ? "sim" : "não",
+        short_description: p.short_description ?? "",
+        description: p.description ?? "",
+        notes: Array.isArray(p.notes) ? p.notes.join("; ") : "",
+        sizes: Array.isArray(p.sizes) ? p.sizes.join("; ") : "",
+        images: Array.isArray(p.images) ? p.images.join("; ") : "",
+        for_whom: p.for_whom ?? "",
+        experience_level: p.experience_level ?? "",
+        rating: p.rating ?? 0,
+        review_count: p.review_count ?? 0,
+      }));
+
+      const csv = Papa.unparse(rows, {
+        quotes: true,
+        delimiter: ";",
+      });
+
+      // Adiciona BOM (\uFEFF) para abrir com acentuação e caracteres corretos no Excel
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
+      link.href = url;
+      link.setAttribute("download", `produtos_secret_desire_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${allProducts.length} produtos exportados com sucesso!`, { id: toastId });
+    } catch (err: any) {
+      toast.error("Erro ao exportar produtos: " + (err.message || "Tente novamente"), { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading) {
@@ -475,6 +536,16 @@ function AdminProducts() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={isExporting}
+            className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-medium hover:border-neon hover:text-neon transition-colors disabled:opacity-50 cursor-pointer"
+            title="Exportar todos os produtos para planilha CSV"
+          >
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {isExporting ? "Exportando…" : "Exportar CSV"}
+          </button>
           <Link
             to="/admin/produtos/importar"
             className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-medium hover:border-neon hover:text-neon transition-colors"

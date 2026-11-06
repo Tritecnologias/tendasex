@@ -111,6 +111,30 @@ export const getAdminProducts = createServerFn().handler(async (): Promise<DbPro
   return (data ?? []) as DbProduct[];
 });
 
+export const getAllProductsForExport = createServerFn().handler(async (): Promise<DbProduct[]> => {
+  const db = createSupabaseAdmin();
+  const allProducts: DbProduct[] = [];
+  const batchSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await db
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + batchSize - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+
+    allProducts.push(...(data as DbProduct[]));
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+
+  return allProducts;
+});
+
 const ProductInput = z.object({
   slug: z.string().min(1),
   name: z.string().min(1),
